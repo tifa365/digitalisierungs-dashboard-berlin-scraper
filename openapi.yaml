@@ -1,0 +1,397 @@
+openapi: 3.0.3
+info:
+  title: Berlin Digitalization Dashboard API
+  description: |
+    API for the Berlin Digitalization Dashboard (Digitalisierungs-Dashboard Berlin).
+
+    This is a Next.js Server Actions API that returns data about public services
+    (Leistungen) and their digitalization status according to the OZG
+    (Onlinezugangsgesetz - Online Access Act).
+
+    **Note**: This API uses Next.js Server Actions format. The `next-action` header
+    contains a hash that may change between deployments.
+  version: 1.0.0
+  contact:
+    name: Berlin Digitalization Dashboard
+    url: https://digitalisierungs-dashboard.berlin.de/
+
+servers:
+  - url: https://digitalisierungs-dashboard.berlin.de
+    description: Production server
+
+paths:
+  /:
+    post:
+      operationId: searchServices
+      summary: Search and filter public services
+      description: |
+        Search for public services (Leistungen) with various filters.
+        Returns paginated results with service details and digitalization status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              maxItems: 1
+              items:
+                $ref: '#/components/schemas/SearchRequest'
+      parameters:
+        - name: next-action
+          in: header
+          required: true
+          description: |
+            Next.js Server Action identifier hash.
+            This value may change between deployments and needs to be extracted from the page.
+            If missing, returns 405 Method Not Allowed.
+          schema:
+            type: string
+            example: "7f9824d5ef028cde6ac686e0a4854e6f1cd8da35cf"
+        - name: next-router-state-tree
+          in: header
+          required: true
+          description: |
+            URL-encoded Next.js router state tree.
+            If missing (with next-action present), returns HTML page (200).
+          schema:
+            type: string
+            example: '%5B%22%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%2Ctrue%5D'
+      responses:
+        '200':
+          description: Successful response with service data
+          content:
+            text/x-component:
+              schema:
+                type: string
+                description: |
+                  RSC (React Server Components) streaming format.
+                  Response contains multiple lines:
+                  - Line 0: Metadata reference
+                  - Line 1: JSON data payload
+
+                  Parse by splitting on newlines and extracting JSON after the colon.
+              example: |
+                0:{"a":"$@1","f":"","b":"pB8gw_6GyPTngUxELaipA"}
+                1:{"page":1,"data":[...],"count":93,"hasMore":true}
+            text/html:
+              schema:
+                type: string
+              description: |
+                Returns HTML page when required headers are missing or invalid.
+                This is the normal web page, not the API response.
+        '400':
+          description: Bad request (e.g., malformed or invalid header values)
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "400 Bad Request"
+        '405':
+          description: Method not allowed (next-action header missing or invalid)
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "Method Not Allowed"
+        '500':
+          description: Server error (e.g., missing required fields in request body)
+          content:
+            text/x-component:
+              schema:
+                type: string
+              example: |
+                0:{"a":"$@1","f":"","b":"pB8gw_6GyPTngUxELaipA"}
+                1:E{"digest":"384568913"}
+
+components:
+  schemas:
+    SearchRequest:
+      type: object
+      required:
+        - page
+        - search
+        - ozg_reifegrad
+        - ressort
+        - politikfeld
+        - efa_umsetzung
+        - ozg_prioritaet
+        - digitalisierungs_potenzial
+        - sdg_relevant
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Page number for pagination (1-indexed)
+          example: 1
+        search:
+          type: string
+          description: Free text search term (use empty string for no filter)
+          example: ""
+        ozg_reifegrad:
+          type: array
+          items:
+            $ref: '#/components/schemas/OzgReifegradFilter'
+          description: Filter by OZG maturity level (use empty array for no filter)
+          example: []
+        ressort:
+          type: array
+          items:
+            $ref: '#/components/schemas/RessortCode'
+          description: Filter by responsible department (use empty array for no filter)
+          example: []
+        politikfeld:
+          type: array
+          items:
+            $ref: '#/components/schemas/PolitikfeldCode'
+          description: Filter by policy area (use empty array for no filter)
+          example: []
+        efa_umsetzung:
+          type: array
+          items:
+            type: string
+            enum: ["Ja", "Nein"]
+          description: Filter by EfA (Einer-für-Alle) implementation status (use empty array for no filter)
+          example: []
+        ozg_prioritaet:
+          type: array
+          items:
+            type: string
+            enum: ["1", "2", "3", "4"]
+          description: Filter by OZG priority level (use empty array for no filter)
+          example: []
+        digitalisierungs_potenzial:
+          type: array
+          items:
+            type: string
+          description: Filter by digitalization potential (use empty array for no filter)
+          example: []
+        sdg_relevant:
+          type: array
+          items:
+            type: string
+            enum: ["ja", "nein"]
+          description: Filter by SDG (Single Digital Gateway) relevance (use empty array for no filter)
+          example: []
+
+    SearchResponse:
+      type: object
+      required:
+        - page
+        - data
+        - count
+        - hasMore
+      properties:
+        page:
+          type: integer
+          description: Current page number
+          example: 1
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Leistung'
+          description: Array of services matching the search criteria
+        count:
+          type: integer
+          description: Total number of matching results
+          example: 93
+        hasMore:
+          type: boolean
+          description: Whether more pages are available
+          example: true
+
+    Leistung:
+      type: object
+      description: A public service (Leistung) with its digitalization status
+      properties:
+        id:
+          type: string
+          description: Unique identifier (SHA-1 hash or numeric ID)
+          example: "2152F7C0E1BCF668A5FCA0CD5B739F6BFAD4F4B5"
+        leistungsbezeichnung:
+          type: string
+          description: Service name/title
+          example: "Ausbildungsförderung bei beruflicher Aufstiegsfortbildung (Meister-BAföG)"
+        leistungsschluessel:
+          type: string
+          description: Unique service key identifier (LeiKa)
+          example: "99131030017000"
+        leistungstypisierung:
+          type: string
+          description: Service type classification
+          example: "2"
+        ozg_reifegrad:
+          type: integer
+          minimum: 0
+          maximum: 5
+          description: |
+            OZG maturity level:
+            - 0: Not digitalized
+            - 1: Information available online
+            - 2: Forms downloadable
+            - 3: Forms submittable online
+            - 4: Fully digital with authentication
+            - 5: Fully automated
+          example: 3
+        ozg_umsetzung:
+          type: string
+          nullable: true
+          description: OZG implementation approach
+          example: "Umsetzung im Rahmen der föderalen Zusammenarbeit"
+        ozg_themenfeld:
+          type: string
+          nullable: true
+          description: OZG topic area
+          example: "Arbeit & Ruhestand"
+        ozg_leistung:
+          type: string
+          nullable: true
+          description: OZG service category
+          example: "Soziale Entschädigung"
+        ozg_prioritaet_foederaleleis:
+          type: string
+          nullable: true
+          enum: ["1", "2", "3", "4", null]
+          description: OZG priority for federal services (1=highest)
+          example: "1"
+        ressort:
+          type: string
+          description: Full name of responsible department
+          example: "Senatsverwaltung für Arbeit, Soziales, Gleichstellung, Integration, Vielfalt und Antidiskriminierung"
+        ressort_kurz:
+          $ref: '#/components/schemas/RessortCode'
+        politikfeld:
+          type: string
+          description: Policy area full name
+          example: "Soziales"
+        politikfeld_kurz:
+          $ref: '#/components/schemas/PolitikfeldCode'
+        link:
+          type: string
+          format: uri
+          nullable: true
+          description: Link to service.berlin.de
+          example: "https://service.berlin.de/dienstleistung/325169/"
+        federfuehrendes_bundesland:
+          type: string
+          nullable: true
+          description: Lead federal state for EfA implementation
+          example: "Nordrhein-Westfalen"
+        umzusetzendes_bundesland:
+          type: string
+          nullable: true
+          description: Federal state responsible for implementation
+          example: "Nordrhein-Westfalen"
+        efa_umsetzung:
+          type: string
+          nullable: true
+          enum: ["Ja", "Nein", null]
+          description: EfA (Einer-für-Alle) implementation status
+          example: "Ja"
+        efa_faehig:
+          type: string
+          nullable: true
+          enum: ["Ja", "Nein", null]
+          description: Whether service is EfA-capable
+          example: "Ja"
+        sdg_informationsbereiche:
+          type: string
+          description: SDG information areas (encoded)
+          example: "0000000"
+        sdg_relevant:
+          type: string
+          enum: ["ja", "nein"]
+          description: SDG (Single Digital Gateway) relevance
+          example: "nein"
+        priorisierung:
+          type: string
+          description: Prioritization assessment
+          example: "Keine Bewertung vorhanden"
+        rechtliche_hindernisse:
+          type: string
+          description: Legal obstacles assessment
+          example: "Keine Bewertung vorhanden"
+        technische_komplexitaet:
+          type: string
+          description: Technical complexity assessment
+          example: "Keine Bewertung vorhanden"
+        digitalisierungs_potential:
+          type: string
+          description: Digitalization potential score
+          example: "0"
+        oeffentliche_aufmerksamkeit:
+          type: string
+          nullable: true
+          description: Public attention assessment
+          example: "Keine Bewertung vorhanden"
+        xoev_standards:
+          type: string
+          nullable: true
+          enum: ["ja", "nein", null]
+          description: Whether XÖV standards apply
+          example: "nein"
+        it_plr_anwendungen:
+          type: string
+          nullable: true
+          description: IT-PLR applications
+        basiskomponente:
+          type: string
+          nullable: true
+          description: Base component used
+
+    OzgReifegradFilter:
+      type: integer
+      minimum: 0
+      maximum: 5
+      description: OZG maturity level for filtering
+
+    RessortCode:
+      type: string
+      description: Short code for Berlin Senate departments
+      enum:
+        - SenASGIVA   # Arbeit, Soziales, Gleichstellung, Integration, Vielfalt und Antidiskriminierung
+        - SenBJF      # Bildung, Jugend und Familie
+        - SenFin      # Finanzen
+        - SenInnSport # Inneres und Sport
+        - SenJustV    # Justiz und Verbraucherschutz
+        - SenMVKU     # Mobilität, Verkehr, Klimaschutz und Umwelt
+        - SenStadt    # Stadtentwicklung, Bauen und Wohnen
+        - SenWGP      # Wissenschaft, Gesundheit und Pflege
+        - SenWiEnBe   # Wirtschaft, Energie und Betriebe
+      example: "SenASGIVA"
+
+    PolitikfeldCode:
+      type: string
+      description: Short code for policy areas
+      enum:
+        - ENG   # Engagement & Hobby
+        - FAM   # Familie & Jugend
+        - GES   # Gesundheit
+        - INN   # Inneres
+        - JSZ   # Justiz
+        - MOB   # Mobilität
+        - SOZ   # Soziales
+        - STE   # Steuern
+        - STW   # Stadtentwicklung & Wohnen
+        - UWN   # Umwelt & Natur
+        - VBS   # Verbraucherschutz
+        - WIR   # Wirtschaft
+        - WIS   # Wissenschaft & Forschung
+      example: "SOZ"
+
+    RscMetadata:
+      type: object
+      description: RSC streaming metadata (line 0 of response)
+      properties:
+        a:
+          type: string
+          description: Reference pointer
+          example: "$@1"
+        f:
+          type: string
+          description: Additional flags
+          example: ""
+        b:
+          type: string
+          description: Build/batch identifier
+          example: "pB8gw_6GyPTngUxELaipA"
