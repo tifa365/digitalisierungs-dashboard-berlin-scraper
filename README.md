@@ -59,7 +59,8 @@ RSC (React Server Components) streaming format with newline-separated chunks:
 
 Parse by extracting the JSON after `1:`.
 
-## Example
+<details>
+<summary>Example curl request</summary>
 
 ```bash
 curl -X POST 'https://digitalisierungs-dashboard.berlin.de/' \
@@ -68,6 +69,7 @@ curl -X POST 'https://digitalisierungs-dashboard.berlin.de/' \
   -H 'next-router-state-tree: %5B%22%22%2C%7B%22children%22%3A%5B%22__PAGE__%22%2C%7B%7D%2Cnull%2Cnull%5D%7D%2Cnull%2Cnull%2Ctrue%5D' \
   -d '[{"page":1,"search":"Ausbildung","ozg_reifegrad":[],"ressort":[],"politikfeld":[],"efa_umsetzung":[],"ozg_prioritaet":[],"digitalisierungs_potenzial":[],"sdg_relevant":[]}]'
 ```
+</details>
 
 ## Filter Options
 
